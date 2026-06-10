@@ -1,5 +1,0 @@
-<?xml version="1.0" ?>
-<data>
-  <program SECTOR_SIZE_IN_BYTES="4096" file_sector_offset="0" filename="gpt_main0.bin" label="PrimaryGPT" num_partition_sectors="6" partofsingleimage="true" physical_partition_number="0" readbackverify="false" size_in_KB="24.0" sparse="false" start_byte_hex="0x0" start_sector="0"/>
-  <program SECTOR_SIZE_IN_BYTES="4096" file_sector_offset="0" filename="gpt_backup0.bin" label="BackupGPT" num_partition_sectors="5" partofsingleimage="true" physical_partition_number="0" readbackverify="false" size_in_KB="20.0" sparse="false" start_byte_hex="(4096*NUM_DISK_SECTORS)-20480." start_sector="NUM_DISK_SECTORS-5."/>
-</data>

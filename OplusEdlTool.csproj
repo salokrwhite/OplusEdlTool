@@ -1,32 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PublishAot>true</PublishAot>
-    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>app.ico</ApplicationIcon>
-  </PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
+
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.0.10" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
-    <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.10" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.0.10" />
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="v1_old_code\**" />
-    <EmbeddedResource Remove="v1_old_code\**" />
-    <None Remove="v1_old_code\**" />
-  </ItemGroup>
+  
 
   <ItemGroup>
     <Content Include="Tools\**\*">
@@ -34,11 +24,5 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <AvaloniaResource Include="Fonts\*.ttf" />
-    <AvaloniaResource Include="Fonts\*.otf" />
-    <AvaloniaResource Include="app.ico" />
   </ItemGroup>
 </Project>

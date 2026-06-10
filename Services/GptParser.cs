@@ -28,6 +28,7 @@ namespace OplusEdlTool.Services
         {
             _onLog?.Invoke(message);
         }
+
         public (List<GptPartitionInfo> partitions, int sectorSize) ParseGpt(string gptFilePath, int defaultSectorSize = 4096)
         {
             var partitions = new List<GptPartitionInfo>();
@@ -36,7 +37,9 @@ namespace OplusEdlTool.Services
             try
             {
                 var data = File.ReadAllBytes(gptFilePath);
+
                 int headerOffset = sectorSize;
+
                 if (data.Length < headerOffset + 92)
                 {
                     Log($"GPT file too small: {data.Length} bytes");
@@ -65,6 +68,7 @@ namespace OplusEdlTool.Services
                 ulong partitionEntryLba = BitConverter.ToUInt64(data, headerOffset + 72);
                 uint numEntries = BitConverter.ToUInt32(data, headerOffset + 80);
                 uint entrySize = BitConverter.ToUInt32(data, headerOffset + 84);
+
                 int entryOffset = (int)(partitionEntryLba * (ulong)sectorSize);
 
                 for (int i = 0; i < numEntries; i++)
@@ -72,6 +76,7 @@ namespace OplusEdlTool.Services
                     int offset = entryOffset + i * (int)entrySize;
                     if (offset + entrySize > data.Length)
                         break;
+
                     bool isEmpty = true;
                     for (int j = 0; j < 16; j++)
                     {

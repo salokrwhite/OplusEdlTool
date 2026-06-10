@@ -55,6 +55,7 @@ namespace OplusEdlTool.Services
                 bool hasGptFile = File.Exists(gptPath);
                 Dictionary<string, GptPartitionInfo> partitionDict = new(StringComparer.OrdinalIgnoreCase);
                 int sectorSize = 4096; 
+
                 if (hasGptFile)
                 {
                     var (gptPartitions, parsedSectorSize) = _gptParser.ParseGpt(gptPath);

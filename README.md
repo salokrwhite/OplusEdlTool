@@ -1,161 +1,63 @@
-# OPLUS EDL Tool (v2)
+# OPLUS EDL Tool v1 (Legacy)
 
-🌐 **Language:** [English](README.md) | [中文](README.zh.md)
+**[中文版本](README.zh.md) | English Version**
 
-> **⚠️ Version Notice:** This is **v2**, a major rewrite of the original tool. The legacy v1 codebase (WPF-based) is archived in the [`v1_old_code/`](v1_old_code/) directory for reference.
+> **⚠️ DEPRECATED: This is the legacy v1 version. It is no longer maintained and contains known issues. Use for reference only.**
 >
-> 🚀 **Latest Version:** The newer **v3** (closed-source) is available [here](https://static-tcdn.anteasy.com/xasdun/upload-log/oet-upload.html)
+> **🚀 Please use [v2](../README.md) instead, which is a complete rewrite with better performance and stability.**
 
-A cross-platform EDL (Emergency Download) flashing tool for OPLUS (OPPO/OnePlus/Realme) devices, built with Avalonia UI.
+---
 
-## What's New in v2
+## ⚠️ Important Notice
 
-v2 is a complete rewrite with the following improvements:
+**This legacy v1 version has the following known issues:**
+- Outdated WPF-based UI with limited functionality
+- Known bugs in partition parsing and flashing operations
+- No longer receiving updates or bug fixes
+- Compatibility issues with newer devices
 
-- **New UI Framework**: Migrated from WPF to **Avalonia UI**
+**This version is provided FOR REFERENCE ONLY. We strongly recommend using v2 instead.**
+
+---
+
+## Archived Information
+
+This directory contains the legacy v1 codebase (WPF-based) for archival purposes.
+
+### Original Features (v1)
+- EDL mode detection and connection
+- Firehose protocol support
+- Basic partition table read/write
+- XML configuration file processing
+- Partition cleanup functionality
+- Multi-language support (English/Chinese)
+- Graphical user interface (WPF)
+
+### System Requirements (Original)
+- Windows 7/8/10/11 (64-bit recommended)
+- .NET 8.0 Runtime
+- Administrator privileges
+- USB 2.0/3.0 interface
+
+---
+
+## Migration to v2
+
+The new **v2** version includes:
+- **New UI Framework**: Migrated from WPF to Avalonia UI
 - **Better Architecture**: Cleaner codebase with improved maintainability
 - **Improved Performance**: Faster partition parsing and flashing operations
-- **Native AOT Compilation**: Single-file deployment, no .NET runtime required, faster startup
+- **Native AOT Compilation**: Single-file deployment, no .NET runtime required
+- **Enhanced Features**: OFP/OPS decryption, super partition support, and more
 
-## Features
+**[👉 Click here to view v2 documentation](../README.md)**
 
-- **Enter Firehose Mode**: Load device programmer (devprg*.mbn) with digest and signature files
-- **Flash ROM Packages**: Support for extracted ROM folders, OFP and OPS encrypted packages
-- **Partition Management**: 
-  - Read partition table from device
-  - Read/Write/Erase individual partitions
-  - Batch flash selected partitions
-- **Super Partition Support**: Automatic merge of segmented super images (super.0.xxx.img, super.1.xxx.img, etc.), supports merging based on super_def.00000000.json definition
-- **Multi-language Support**: English and Chinese interface
-- **Auto Port Detection**: Automatic detection of Qualcomm 9008 EDL port
-
-## Screenshots
-
-### Read Partition Table
-![Read Partition Table](Picture/ReadGPT.png)
-
-### Backup Partitions
-![Backup Partitions](Picture/ReadPartition.png)
-
-## Requirements
-
-- Windows 10/11 (x64)
-- .NET 8.0 Runtime
-- Qualcomm USB drivers installed
-
-## Building from Source
-
-### Prerequisites
-
-- .NET 8.0 SDK
-- Visual Studio 2022 or JetBrains Rider (optional)
-
-### Build Commands
-
-```bash
-# Clone the repository
-git clone https://github.com/salokrwhite/Oplus_EDL_Tool.git
-cd Oplus_EDL_Tool
-
-# Restore dependencies
-dotnet restore
-
-# Build
-dotnet build
-
-# Run
-dotnet run
-
-# Publish (AOT compiled)
-dotnet publish -c Release
-```
-
-## Usage
-
-### 1. Enter Firehose Mode
-
-If your device is in EDL mode but not in Firehose mode:
-
-1. Select the device programmer file (devprg*.mbn)
-2. Select the digest file (*.bin)
-3. Select the signature file (*.bin)
-4. Click "Enter Firehose" button
-
-### 2. Flash ROM Package
-
-1. Click the folder button to select ROM source:
-   - **Folder**: Select an extracted ROM folder containing IMAGES directory
-   - **File**: Select OFP or OPS encrypted ROM file (will be automatically decrypted)
-2. Select the rawprogram XML files to load
-3. Click "Load" to parse partitions
-4. Select partitions to flash (use checkbox)
-5. Click "Start Flash" to begin flashing
-
-### 3. Partition Operations
-
-- **Read Partitions**: Read partition table from device
-- **Read Selected**: Backup selected partitions to files
-- **Write Selected**: Write selected partitions to device
-- **Erase Selected**: Erase selected partitions
-
-### Options
-
-- **Export XML**: Export selected partitions to rawprogram XML when backing up
-- **Protect LUN5**: Skip flashing partitions in rawprogram5.xml to protect LUN5
-- **Auto Reboot**: Automatically reboot device after flashing
-
-## Project Structure
-
-```
-OplusEdlTool/
-├── App.axaml              # Application XAML
-├── App.axaml.cs           # Application entry point
-├── MainWindow.axaml       # Main window UI
-├── MainWindow.axaml.cs    # Main window logic
-├── AboutWindow.axaml      # About dialog
-├── Services/
-│   ├── EdlService.cs      # EDL communication service
-│   ├── LanguageService.cs # Multi-language support
-│   ├── OfpDecryptor.cs    # OFP file decryption
-│   ├── OpsDecryptor.cs    # OPS file decryption
-│   ├── GptParser.cs       # GPT partition table parser
-│   ├── RawProgramXmlProcessor.cs  # rawprogram XML parser
-│   ├── SuperMergeService.cs       # Super partition merge
-│   └── ProcessRunner.cs   # External process runner
-├── Tools/                 # External tools
-│   ├── fh_loader.exe      # Qualcomm Firehose loader
-│   ├── QSaharaServer.exe  # Qualcomm Sahara protocol server
-│   ├── lsusb.exe          # USB device detection
-│   ├── simg2img.exe       # Sparse image converter
-│   └── lpmake.exe         # Dynamic partition (super) image creation tool
-└── Fonts/                 # Custom fonts
-```
-
-## Dependencies
-
-- [Avalonia UI](https://avaloniaui.net/) - Cross-platform UI framework
-- [System.Management](https://www.nuget.org/packages/System.Management/) - WMI access for device detection
+---
 
 ## Disclaimer
 
-**USE AT YOUR OWN RISK!**
+This tool is for educational and research purposes only. Users should comply with local laws and regulations and not use it for any illegal activities. Developers are not responsible for misuse of the tool.
 
-This tool is provided for educational and development purposes only. Flashing firmware can potentially brick your device. The authors are not responsible for any damage caused by using this tool.
+Using deprecated software may result in device damage or data loss. Use at your own risk.
 
-- Always backup your data before flashing
-- Make sure you have the correct firmware for your device
-- Do not flash persist partition unless you know what you're doing
-
-## License
-
-This project is open source. See [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## Acknowledgments
-
-- Qualcomm for the Firehose protocol
-- The Android development community
-- Coolapk@MouZei
+---

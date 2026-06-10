@@ -222,10 +222,8 @@ namespace OplusEdlTool.Services
                     var imgFileName = Path.GetFileName(imgPath);
                     var rawFileName = Path.GetFileNameWithoutExtension(imgFileName) + ".raw";
                     var rawPath = Path.Combine(imagesDir, rawFileName);
-
                     _onLog?.Invoke($"Converting {imgFileName}...");
                     _onProgress?.Invoke((currentIndex * 50) / totalPartitions);
-
                     var success = await RunProcessAsync(localSimg2img, $"\"{imgPath}\" \"{rawPath}\"", imagesDir);
                     
                     if (success && File.Exists(rawPath))
@@ -298,15 +296,19 @@ namespace OplusEdlTool.Services
         private string BuildLpmakeArgs(SuperConfig config, List<string> rawFiles, string imagesDir, string outputPath)
         {
             var args = new List<string>();
+
             if (config.SuperMeta != null)
             {
                 args.Add($"--metadata-size {config.SuperMeta.Size}");
             }
+
             args.Add("--metadata-slots 2");
+
             foreach (var dev in config.BlockDevices)
             {
                 args.Add($"--device {dev.Name}:{dev.Size}");
             }
+
             foreach (var grp in config.Groups)
             {
                 if (!string.IsNullOrEmpty(grp.MaximumSize))
@@ -321,11 +323,8 @@ namespace OplusEdlTool.Services
             foreach (var part in partitionsWithPath)
             {
                 if (rawIndex >= rawFiles.Count) break;
-
                 var rawFile = rawFiles[rawIndex];
-                
                 args.Add($"--partition {part.Name}:readonly:{part.Size}:{part.GroupName}");
-                
                 args.Add($"--image {part.Name}=\"{rawFile}\"");
                 
                 rawIndex++;

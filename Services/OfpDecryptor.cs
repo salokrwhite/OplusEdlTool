@@ -155,6 +155,7 @@ namespace OplusEdlTool.Services
             rf.Seek(offset, SeekOrigin.Begin);
             byte[] data = new byte[length];
             rf.ReadExactly(data, 0, length);
+            
             Log($"Encrypted data first 16 bytes: {BitConverter.ToString(data, 0, Math.Min(16, data.Length))}");
 
             foreach (var keyset in KeySets)
@@ -214,8 +215,10 @@ namespace OplusEdlTool.Services
             byte[] key1 = Convert.FromHexString("42F2D5399137E2B2813CD8ECDF2F4D72");
             byte[] key2 = Convert.FromHexString("F6C50203515A2CE7D8C3E1F938B7E94C");
             byte[] key3 = Convert.FromHexString("67657963787565E837D226B69A495D21");
+            
             byte[] shuffledKey2 = KeyShuffle(key2, key3);
             byte[] shuffledKey1 = KeyShuffle(key1, key3);
+            
             using var md5 = MD5.Create();
             string keyHex = BitConverter.ToString(md5.ComputeHash(shuffledKey2)).Replace("-", "").ToLower().Substring(0, 16);
             string ivHex = BitConverter.ToString(md5.ComputeHash(shuffledKey1)).Replace("-", "").ToLower().Substring(0, 16);
@@ -238,6 +241,7 @@ namespace OplusEdlTool.Services
         public string? Decrypt(string ofpFilePath, string? outputDir = null)
         {
             if (!File.Exists(ofpFilePath)) { Log($"File not found: {ofpFilePath}"); return null; }
+
             using (var rf = new FileStream(ofpFilePath, FileMode.Open, FileAccess.Read))
             {
                 byte[] header = new byte[2];
@@ -360,6 +364,7 @@ namespace OplusEdlTool.Services
             string extractPath = outputDir ?? Path.Combine(basePath, "extract");
             if (Directory.Exists(extractPath)) Directory.Delete(extractPath, true);
             Directory.CreateDirectory(extractPath);
+
             try
             {
                 ZipFile.ExtractToDirectory(zipPath, extractPath);

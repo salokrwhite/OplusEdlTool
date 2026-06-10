@@ -8,33 +8,6 @@ using System.Threading.Tasks;
 
 namespace OplusEdlTool.Services
 {
-    public enum OplusRwMode
-    {
-        Normal,
-        GptBackup,
-        GptMain1,
-        GptMain2
-    }
-
-    public class PartitionSlice
-    {
-        public ulong StartSector { get; set; }
-        public ulong NumSectors { get; set; }
-        public string Filename { get; set; } = "";
-        public string Label { get; set; } = "";
-        public int PhysicalPartitionNumber { get; set; }
-        public long FileOffset { get; set; }  
-        public long ByteSize { get; set; }    
-    }
-
-    public class LunFirstPartitionInfo
-    {
-        public int Lun { get; set; }
-        public string Filename { get; set; } = "";
-        public string Label { get; set; } = "";
-        public ulong StartSector { get; set; }
-    }
-
     public class EdlService
     {
         private readonly System.Action<string>? onLine;
@@ -73,37 +46,6 @@ namespace OplusEdlTool.Services
             if (!Directory.Exists(workDir)) Directory.CreateDirectory(workDir);
             WorkDirCache = workDir;
             return workDir;
-        }
-
-        public void BackupPortTrace()
-        {
-            var workDir = GetWorkDir();
-            var traceFile = Path.Combine(workDir, "port_trace.txt");
-            if (File.Exists(traceFile))
-            {
-                var backupFile = Path.Combine(workDir, $"port_trace_backup_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                try
-                {
-                    File.Copy(traceFile, backupFile, true);
-                    onLine?.Invoke($"[Debug] Backed up port_trace.txt to {Path.GetFileName(backupFile)}");
-                }
-                catch { }
-            }
-        }
-
-        public string? GetFullPortTraceLog()
-        {
-            var workDir = GetWorkDir();
-            var traceFile = Path.Combine(workDir, "port_trace.txt");
-            if (File.Exists(traceFile))
-            {
-                try
-                {
-                    return File.ReadAllText(traceFile);
-                }
-                catch { }
-            }
-            return null;
         }
         private string BuildDevicePath(string com) => "\\\\.\\" + com;
         
@@ -181,6 +123,7 @@ namespace OplusEdlTool.Services
             var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
             return res.Item1 == 0;
         }
+        
         public async Task<(string rwmode, string gptmainMode)> TestRwModeAsync(string port)
         {
             var tools = FindToolsDir();
@@ -189,6 +132,7 @@ namespace OplusEdlTool.Services
             var sectorSize = StorageType == "emmc" ? 512 : 4096;
             var device = BuildDevicePath(port);
             var fhLoader = Path.Combine(tools, "fh_loader.exe");
+
             var content = $"<?xml version=\"1.0\" ?><data><program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" filename=\"tmp.bin\" physical_partition_number=\"0\" label=\"5-35\" start_sector=\"5\" num_partition_sectors=\"31\"/></data>";
             await File.WriteAllTextAsync(xml, content);
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xml}\" --convertprogram2read --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete --special_rw_mode=oplus_gptbackup --noprompt";
@@ -197,6 +141,7 @@ namespace OplusEdlTool.Services
             {
                 return ("oplus_gptbackup", "");
             }
+
             content = $"<?xml version=\"1.0\" ?><data><program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" filename=\"tmp.bin\" physical_partition_number=\"0\" label=\"33-35\" start_sector=\"33\" num_partition_sectors=\"3\"/></data>";
             await File.WriteAllTextAsync(xml, content);
             args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xml}\" --convertprogram2read --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete --special_rw_mode=oplus_gptmain --noprompt";
@@ -300,6 +245,7 @@ namespace OplusEdlTool.Services
             var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
             return res.Item1 == 0;
         }
+        
         public async Task<bool> WriteGptAsync(string port, int lun, string filePath)
         {
             var tools = FindToolsDir();
@@ -308,12 +254,15 @@ namespace OplusEdlTool.Services
             var len = new FileInfo(filePath).Length;
             var numSectors = (ulong)len / (ulong)sectorSize;
             var xml = Path.Combine(workDir, "cmd.xml");
+            
             var gptBackupName = $"gpt_backup{lun}.bin";
             var gptBackupPath = Path.Combine(workDir, gptBackupName);
             File.Copy(filePath, gptBackupPath, overwrite: true);
+            
             var content = $"<?xml version=\"1.0\" ?><data><program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" filename=\"{gptBackupName}\" physical_partition_number=\"{lun}\" label=\"BackupGPT\" start_sector=\"0\" num_partition_sectors=\"{numSectors}\"/></data>";
             await File.WriteAllTextAsync(xml, content);
             var device = BuildDevicePath(port);
+            
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xml}\" --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete --special_rw_mode=oplus_gptbackup --search_path=\"{workDir}\" --noprompt";
             var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
             
@@ -329,10 +278,10 @@ namespace OplusEdlTool.Services
             var outDir = Path.Combine(workDir, dirname);
             Directory.CreateDirectory(outDir);
             var device = BuildDevicePath(port);
+            
             var xmlArg = string.Join(",", xmls);
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xmlArg}\" --convertprogram2read --mainoutputdir=\"{outDir}\" --skip_configure --showpercentagecomplete --special_rw_mode={rwmode} --noprompt";
             
-            // Debug log only in verbose mode
             if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] fh_loader args: {args}");
             
             var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
@@ -359,7 +308,6 @@ namespace OplusEdlTool.Services
             foreach (var part in partitions)
             {
                 onLine?.Invoke($"Reading partition: {part.Name} (LUN {part.Lun})");
-                
                 var numSectors = (part.SizeBytes / (ulong)sectorSize);
                 var fileName = $"{part.Name}.bin";
                 var xml = Path.Combine(workDir, $"read_{part.Name}.xml");
@@ -368,7 +316,6 @@ namespace OplusEdlTool.Services
                 var xmlList = new List<string> { xml };
                 var partOutDir = await ReadByXmlAsync(port, xmlList, rwmode);
                 try { File.Delete(xml); } catch { }
-                
                 if (partOutDir == null)
                 {
                     onLine?.Invoke($"Failed to read partition: {part.Name}");
@@ -390,7 +337,6 @@ namespace OplusEdlTool.Services
                     onLine?.Invoke($"Warning: Failed to move file for {part.Name}: {ex.Message}");
                 }
             }
-
             onLine?.Invoke($"Auto read completed. Output: {outDir}");
             return outDir;
         }
@@ -403,6 +349,7 @@ namespace OplusEdlTool.Services
             if (searchPath.EndsWith("\\")) searchPath = searchPath.TrimEnd('\\');
             if (searchPath.EndsWith(":")) searchPath += ".";
             var rwmodeArg = string.IsNullOrEmpty(rwmode) ? "" : $"--special_rw_mode={rwmode}";
+            
             foreach (var xmlPath in xmls)
             {
                 var partitionInfos = ParsePartitionInfoFromXml(xmlPath);
@@ -412,7 +359,6 @@ namespace OplusEdlTool.Services
                     
                     var singleXml = GenerateSinglePartitionXml(xmlPath, info.label, workDir);
                     if (singleXml == null) continue;
-                    
                     var args = $"--port={device} --memoryname={StorageType} --search_path=\"{searchPath}\" --sendxml=\"{singleXml}\" --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete {rwmodeArg} --noprompt";
                     
                     if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] fh_loader args: {args}");
@@ -449,14 +395,18 @@ namespace OplusEdlTool.Services
                 foreach (var info in partitionInfos)
                 {
                     onLine?.Invoke($"Flashing: {info.label}");
+                    
                     var singleXml = GenerateSinglePartitionXml(xmlPath, info.label, workDir);
                     if (singleXml == null) continue;
+                    
                     var args = $"--port={device} --memoryname={StorageType} --search_path=\"{searchPath}\" --sendxml=\"{singleXml}\" --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete --special_rw_mode={rwmode} --noprompt";
                     
                     if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] fh_loader args: {args}");
+                    
                     var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
                     
                     try { File.Delete(singleXml); } catch { }
+                    
                     if (res.Item1 != 0)
                     {
                         onLine?.Invoke($"Failed to flash: {info.label}");
@@ -475,6 +425,10 @@ namespace OplusEdlTool.Services
             var device = BuildDevicePath(port);
             var fhLoader = Path.Combine(tools, "fh_loader.exe");
 
+            var originalVerbose = ProcessRunner.VerboseLogging;
+            ProcessRunner.VerboseLogging = true;
+            onLine?.Invoke("[New Oplus RW Mode] Verbose logging enabled");
+
             onLine?.Invoke("Testing RW mode...");
             var (rwmode, gptmainMode) = await TestRwModeAsync(port);
             onLine?.Invoke($"RW mode detected: {rwmode}" + (string.IsNullOrEmpty(gptmainMode) ? "" : $" mode={gptmainMode}"));
@@ -482,13 +436,13 @@ namespace OplusEdlTool.Services
             if (searchPath.EndsWith("\\")) searchPath = searchPath.TrimEnd('\\');
             if (searchPath.EndsWith(":")) searchPath += ".";
 
-            if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] Total XML files to process: {xmls.Count}");
+            onLine?.Invoke($"[DEBUG] Total XML files to process: {xmls.Count}");
             foreach (var xmlPath in xmls)
             {
-                if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] Processing XML: {Path.GetFileName(xmlPath)}");
+                onLine?.Invoke($"[DEBUG] Processing XML: {Path.GetFileName(xmlPath)}");
                 
                 var allPartitions = ParseFullPartitionInfoFromXml(xmlPath);
-                if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] Found {allPartitions.Count} partitions in {Path.GetFileName(xmlPath)}");
+                onLine?.Invoke($"[DEBUG] Found {allPartitions.Count} partitions in {Path.GetFileName(xmlPath)}");
                 
                 if (allPartitions.Count == 0)
                 {
@@ -497,19 +451,23 @@ namespace OplusEdlTool.Services
                 }
 
                 var partitionsByLun = allPartitions.GroupBy(p => p.physicalPartitionNumber).ToDictionary(g => g.Key, g => g.ToList());
-                if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] Grouped into {partitionsByLun.Count} LUNs");
+                onLine?.Invoke($"[DEBUG] Grouped into {partitionsByLun.Count} LUNs");
 
                 foreach (var lunGroup in partitionsByLun)
                 {
                     var lun = lunGroup.Key;
                     var partitions = lunGroup.Value;
-                    if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] LUN {lun}: {partitions.Count} partitions");
+                    onLine?.Invoke($"[DEBUG] LUN {lun}: {partitions.Count} partitions");
 
                     var firstPartition = partitions.FirstOrDefault();
+                    if (firstPartition != null)
+                    {
+                        onLine?.Invoke($"[DEBUG] First partition of LUN {lun}: {firstPartition.label} (filename={firstPartition.filename})");
+                    }
 
                     foreach (var partition in partitions)
                     {
-                        onLine?.Invoke($"Flashing: {partition.label}");
+                        onLine?.Invoke($"Flashing: {partition.label} (LUN {lun}, sector {partition.startSector}-{partition.EndSector - 1}, size={partition.numPartitionSectors})");
 
                         var modifiedXml = GenerateModifiedPartitionXml(
                             xmlPath, partition, firstPartition, rwmode, gptmainMode, workDir);
@@ -522,31 +480,30 @@ namespace OplusEdlTool.Services
 
                         var args = $"--port={device} --memoryname={StorageType} --search_path=\"{searchPath}\" --sendxml=\"{modifiedXml}\" --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete --special_rw_mode={rwmode} --noprompt";
 
-                        if (ProcessRunner.VerboseLogging)
-                        {
-                            onLine?.Invoke($"[DEBUG] fh_loader command: {fhLoader}");
-                            onLine?.Invoke($"[DEBUG] fh_loader args: {args}");
-                        }
+                        onLine?.Invoke($"[DEBUG] fh_loader command: {fhLoader}");
+                        onLine?.Invoke($"[DEBUG] fh_loader args: {args}");
 
                         var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-                        if (ProcessRunner.VerboseLogging) onLine?.Invoke($"[DEBUG] fh_loader exit code: {res.Item1}");
+                        onLine?.Invoke($"[DEBUG] fh_loader exit code: {res.Item1}");
 
-                        try { File.Delete(modifiedXml); } catch { }
+                        onLine?.Invoke($"[DEBUG] Modified XML saved: {modifiedXml}");
 
                         if (res.Item1 != 0)
                         {
-                            onLine?.Invoke($"Failed to flash: {partition.label}");
+                            onLine?.Invoke($"[ERROR] Failed to flash: {partition.label}");
+                            ProcessRunner.VerboseLogging = originalVerbose;
                             return false;
                         }
                         else
                         {
-                            onLine?.Invoke($"{partition.label} flashed successfully");
+                            onLine?.Invoke($"[SUCCESS] {partition.label} flashed successfully");
                         }
                     }
                 }
             }
 
-            onLine?.Invoke($"All partitions flashed successfully");
+            ProcessRunner.VerboseLogging = originalVerbose;
+            onLine?.Invoke($"[New Oplus RW Mode] All partitions flashed successfully");
             return true;
         }
 
@@ -588,13 +545,14 @@ namespace OplusEdlTool.Services
             return partitions;
         }
 
-        public class PartitionXmlInfo
+        private class PartitionXmlInfo
         {
             public string label { get; set; } = "";
             public string filename { get; set; } = "";
             public int physicalPartitionNumber { get; set; }
             public ulong startSector { get; set; }
             public ulong numPartitionSectors { get; set; }
+
             public ulong EndSector => startSector + numPartitionSectors;
         }
 
@@ -611,7 +569,9 @@ namespace OplusEdlTool.Services
                 var doc = System.Xml.Linq.XDocument.Load(sourceXmlPath);
                 var dataElement = doc.Element("data");
                 if (dataElement == null) return null;
+
                 var programs = dataElement.Elements("program").ToList();
+
                 System.Xml.Linq.XElement? targetProgram = null;
                 foreach (var program in programs)
                 {
@@ -760,6 +720,7 @@ namespace OplusEdlTool.Services
                 return null;
             }
         }
+
         public async Task<bool> WritePatchXmlAsync(string port, string patchXmlPath, string rwmode)
         {
             var tools = FindToolsDir();
@@ -774,6 +735,7 @@ namespace OplusEdlTool.Services
 
             var patchFileName = Path.GetFileName(patchXmlPath);
             onLine?.Invoke($"Writing patch: {patchFileName}...");
+            
             var rwmodeArg = string.IsNullOrEmpty(rwmode) ? "" : $"--special_rw_mode={rwmode}";
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{patchXmlPath}\" --mainoutputdir=\"{workDir}\" --skip_configure --showpercentagecomplete {rwmodeArg} --noprompt";
             
@@ -795,6 +757,7 @@ namespace OplusEdlTool.Services
         {
             int successCount = 0;
             var patchNumbers = new List<int>();
+
             foreach (var xmlPath in selectedRawProgramXmls)
             {
                 var fileName = Path.GetFileName(xmlPath).ToLower();
@@ -845,33 +808,6 @@ namespace OplusEdlTool.Services
             return successCount;
         }
 
-        public async Task<bool> SendSetBootableStorageDriveAsync(string port)
-        {
-            var tools = FindToolsDir();
-            var workDir = GetWorkDir();
-            var device = BuildDevicePath(port);
-            var value = StorageType == "emmc" ? "0" : "1";
-            var xml = Path.Combine(workDir, "setbootable_cmd.xml");
-            var content = $"<?xml version=\"1.0\" ?><data><setbootablestoragedrive value=\"{value}\" /></data>";
-            await File.WriteAllTextAsync(xml, content);
-            onLine?.Invoke($"Sending setbootablestoragedrive (value={value})...");
-            var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xml}\" --mainoutputdir=\"{workDir}\" --skip_configure --noprompt";
-            var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
-            
-            try { File.Delete(xml); } catch { }
-            
-            if (res.Item1 == 0)
-            {
-                onLine?.Invoke("setbootablestoragedrive command sent successfully");
-                return true;
-            }
-            else
-            {
-                onLine?.Invoke("Warning: Failed to send setbootablestoragedrive command");
-                return false;
-            }
-        }
-
         public async Task<bool> ErasePartitionAsync(string port, string rwmode, PartitionEntry part)
         {
             var tools = FindToolsDir();
@@ -904,10 +840,13 @@ namespace OplusEdlTool.Services
             var tools = FindToolsDir();
             var workDir = GetWorkDir();
             var device = BuildDevicePath(port);
+            
             var xml = Path.Combine(workDir, "reboot_cmd.xml");
             var content = "<?xml version=\"1.0\" ?><data><power value=\"reset\" /></data>";
             await File.WriteAllTextAsync(xml, content);
+            
             onLine?.Invoke("Sending reboot command...");
+            
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xml}\" --mainoutputdir=\"{workDir}\" --skip_configure --noprompt";
             var res = await ProcessRunner.RunAsync(Path.Combine(tools, "fh_loader.exe"), args, workDir, onLine, onPercent);
             
@@ -932,7 +871,8 @@ namespace OplusEdlTool.Services
                 var workDir = GetWorkDir();
                 if (Directory.Exists(workDir))
                 {
-                    var preserveFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "language.json" };
+                    var preserveFiles = new List<string> { "language.json" };
+
                     foreach (var file in Directory.GetFiles(workDir))
                     {
                         var fileName = Path.GetFileName(file);
@@ -987,6 +927,7 @@ namespace OplusEdlTool.Services
             try
             {
                 var data = File.ReadAllBytes(gptPath);
+
                 int headerOffset = sectorSize;
                 if (data.Length < headerOffset + 8)
                 {
@@ -1009,6 +950,7 @@ namespace OplusEdlTool.Services
                     int offset = entryOffset + i * entrySize;
                     if (offset + entrySize > data.Length)
                         break;
+
                     bool isEmpty = true;
                     for (int j = 0; j < 16; j++)
                     {
@@ -1019,8 +961,10 @@ namespace OplusEdlTool.Services
                         }
                     }
                     if (isEmpty) continue;
+
                     ulong firstLba = BitConverter.ToUInt64(data, offset + 32);
                     ulong lastLba = BitConverter.ToUInt64(data, offset + 40);
+
                     var nameBytes = new byte[72];
                     Array.Copy(data, offset + 56, nameBytes, 0, 72);
                     var name = System.Text.Encoding.Unicode.GetString(nameBytes).TrimEnd('\0');
@@ -1042,6 +986,7 @@ namespace OplusEdlTool.Services
                 return null;
             }
         }
+
         private string CreateSuperPartitionXml(ulong startSector, ulong numSectors, int sectorSize, string outputFileName)
         {
             var workDir = GetWorkDir();
@@ -1053,9 +998,11 @@ namespace OplusEdlTool.Services
             File.WriteAllText(xmlPath, content);
             return xmlPath;
         }
+
         public async Task<string?> BackupSuperPartitionAsync(string port, string rwmode, string outputDir)
         {
             var sectorSize = StorageType == "emmc" ? 512 : 4096;
+
             onLine?.Invoke("Reading GPT to get super partition info...");
             var superInfo = await ReadSuperPartitionInfoAsync(port, rwmode);
             if (superInfo == null)
@@ -1065,9 +1012,11 @@ namespace OplusEdlTool.Services
             }
 
             var (startSector, numSectors) = superInfo.Value;
+
             var outputFileName = "super.bin";
             var xmlPath = CreateSuperPartitionXml(startSector, numSectors, sectorSize, outputFileName);
             onLine?.Invoke($"Created super partition XML: start_sector={startSector}, num_sectors={numSectors}");
+
             var tools = FindToolsDir();
             var device = BuildDevicePath(port);
             var args = $"--port={device} --memoryname={StorageType} --sendxml=\"{xmlPath}\" --convertprogram2read --mainoutputdir=\"{outputDir}\" --skip_configure --showpercentagecomplete --special_rw_mode={rwmode} --noprompt";
@@ -1107,823 +1056,6 @@ namespace OplusEdlTool.Services
         public static bool IsSuperPartition(string partitionName)
         {
             return partitionName.Equals("super", StringComparison.OrdinalIgnoreCase);
-        }
-
-        public async Task<bool> FlashPartitionNormalAsync(string port, string rwmode, PartitionEntry partition, string filePath)
-        {
-            if (!File.Exists(filePath))
-            {
-                onLine?.Invoke($"[Error] File not found: {filePath}");
-                return false;
-            }
-
-            var tools = FindToolsDir();
-            var workDir = GetWorkDir();
-            var device = BuildDevicePath(port);
-            var fhLoader = Path.Combine(tools, "fh_loader.exe");
-            var sectorSize = StorageType == "emmc" ? 512 : 4096;
-            var fileSize = new FileInfo(filePath).Length;
-            var actualNumSectors = (fileSize + sectorSize - 1) / sectorSize;
-            var xmlContent = $"<?xml version=\"1.0\" ?><data>" +
-                $"<program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" " +
-                $"filename=\"{Path.GetFileName(filePath)}\" " +
-                $"label=\"{partition.Name}\" " +
-                $"num_partition_sectors=\"{actualNumSectors}\" " +
-                $"physical_partition_number=\"{partition.Lun}\" " +
-                $"sparse=\"false\" " +
-                $"start_sector=\"{partition.FirstLBA}\" />" +
-                $"</data>";
-
-            var xmlPath = Path.Combine(workDir, $"flash_{partition.Name}_{Guid.NewGuid():N}.xml");
-            await File.WriteAllTextAsync(xmlPath, xmlContent);
-            var searchPath = Path.GetDirectoryName(filePath) ?? workDir;
-            if (searchPath.EndsWith("\\")) searchPath = searchPath.TrimEnd('\\');
-            if (searchPath.EndsWith(":")) searchPath += ".";
-            var rwmodeArg = string.IsNullOrEmpty(rwmode) ? "" : $"--special_rw_mode={rwmode}";
-
-            var args = $"--port={device} --memoryname={StorageType} " +
-                $"--search_path=\"{searchPath}\" " +
-                $"--sendxml=\"{xmlPath}\" " +
-                $"--mainoutputdir=\"{workDir}\" " +
-                $"--skip_configure --showpercentagecomplete {rwmodeArg} --noprompt";
-
-            var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-
-            try
-            {
-                var traceFile = Path.Combine(workDir, "port_trace.txt");
-                if (File.Exists(traceFile))
-                {
-                    var traceContent = await File.ReadAllTextAsync(traceFile);
-                    var logFile = Path.Combine(workDir, "flash_full_log.txt");
-                    await File.AppendAllTextAsync(logFile, $"\n\n========== {partition.Name} (Normal Write) ==========\n{traceContent}");
-                }
-            }
-            catch { }
-
-            try { File.Delete(xmlPath); } catch { }
-
-            return res.Item1 == 0;
-        }
-
-        private const long CHUNK_THRESHOLD = 100 * 1024 * 1024; 
-        private const long CHUNK_SIZE = 64 * 1024 * 1024; 
-        private const int CHUNK_DELAY_MS = 200; 
-        public class FlashPartitionInfo
-        {
-            public string Name { get; set; } = "";
-            public string FilePath { get; set; } = "";
-            public string Lun { get; set; } = "0";
-            public ulong StartSector { get; set; }
-            public ulong NumSectors { get; set; }
-            public int SectorSize { get; set; } = 4096;
-            public long FileSize { get; set; }
-        }
-
-        public async Task<bool> FlashPartitionsWithSpoofAsync(
-            string port, 
-            List<FlashPartitionInfo> partitions, 
-            CancellationToken cancellationToken = default)
-        {
-            var tools = FindToolsDir();
-            var workDir = GetWorkDir();
-            var device = BuildDevicePath(port);
-            var fhLoader = Path.Combine(tools, "fh_loader.exe");
-            var fullLogFile = Path.Combine(workDir, "flash_full_log.txt");
-            try
-            {
-                await File.WriteAllTextAsync(fullLogFile, $"========== Flash Log Started at {DateTime.Now:yyyy-MM-dd HH:mm:ss} ==========\n");
-            }
-            catch { }
-            onLine?.Invoke($"[Debug] Full log will be saved to: {fullLogFile}");
-
-            foreach (var partition in partitions)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    onLine?.Invoke("Task cancelled");
-                    return false;
-                }
-
-                if (!File.Exists(partition.FilePath))
-                {
-                    onLine?.Invoke($"[Skip] File not found: {partition.Name}");
-                    continue;
-                }
-
-                var fileSize = new FileInfo(partition.FilePath).Length;
-                partition.FileSize = fileSize;
-                var spoofLabel = "BackupGPT";
-                var spoofFilename = $"gpt_backup{partition.Lun}.bin";
-
-                onLine?.Invoke($"[Flash] Writing {partition.Name} (LUN{partition.Lun}, {FormatFileSize(fileSize)})...");
-
-                bool success;
-                if (fileSize > CHUNK_THRESHOLD)
-                {
-                    onLine?.Invoke($"[Strategy] Chunked write enabled ({fileSize / 1024 / 1024} MB)");
-                    success = await FlashPartitionChunkedAsync(
-                        fhLoader, device, workDir, partition, spoofLabel, spoofFilename, cancellationToken);
-                }
-                else
-                {
-                    success = await FlashPartitionSingleAsync(
-                        fhLoader, device, workDir, partition, spoofLabel, spoofFilename, cancellationToken);
-                }
-
-                if (!success)
-                {
-                    onLine?.Invoke($"[Fail] {partition.Name} write failed");
-                    return false;
-                }
-                
-                onLine?.Invoke($"[Success] {partition.Name} written successfully");
-            }
-
-            return true;
-        }
-
-        private async Task<bool> FlashPartitionSingleAsync(
-            string fhLoader,
-            string device,
-            string workDir,
-            FlashPartitionInfo partition,
-            string spoofLabel,
-            string spoofFilename,
-            CancellationToken ct)
-        {
-            var actualNumSectors = (partition.FileSize + partition.SectorSize - 1) / partition.SectorSize;
-            var xmlContent = $"<?xml version=\"1.0\" ?><data>" +
-                $"<program SECTOR_SIZE_IN_BYTES=\"{partition.SectorSize}\" " +
-                $"filename=\"{spoofFilename}\" " +
-                $"label=\"{spoofLabel}\" " +
-                $"num_partition_sectors=\"{actualNumSectors}\" " +
-                $"physical_partition_number=\"{partition.Lun}\" " +
-                $"sparse=\"false\" " +
-                $"start_sector=\"{partition.StartSector}\" />" +
-                $"</data>";
-
-            var xmlPath = Path.Combine(workDir, $"flash_{partition.Name}_{Guid.NewGuid():N}.xml");
-            await File.WriteAllTextAsync(xmlPath, xmlContent, ct);
-            var searchPath = Path.GetDirectoryName(partition.FilePath) ?? workDir;
-            if (searchPath.EndsWith("\\")) searchPath = searchPath.TrimEnd('\\');
-            if (searchPath.EndsWith(":")) searchPath += ".";
-            var spoofFilePath = Path.Combine(workDir, spoofFilename);
-            try
-            {
-                File.Copy(partition.FilePath, spoofFilePath, true);
-            }
-            catch (Exception ex)
-            {
-                onLine?.Invoke($"[Error] Failed to copy file: {ex.Message}");
-                return false;
-            }
-
-            var args = $"--port={device} --memoryname={StorageType} " +
-                $"--search_path=\"{workDir}\" " +
-                $"--sendxml=\"{xmlPath}\" " +
-                $"--mainoutputdir=\"{workDir}\" " +
-                $"--skip_configure --showpercentagecomplete --noprompt";
-
-            var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-            try
-            {
-                var traceFile = Path.Combine(workDir, "port_trace.txt");
-                if (File.Exists(traceFile))
-                {
-                    var traceContent = await File.ReadAllTextAsync(traceFile);
-                    var logFile = Path.Combine(workDir, "flash_full_log.txt");
-                    await File.AppendAllTextAsync(logFile, $"\n\n========== {partition.Name} (Single Write) ==========\n{traceContent}");
-                }
-            }
-            catch { }
-            try { File.Delete(xmlPath); } catch { }
-            try { File.Delete(spoofFilePath); } catch { }
-
-            return res.Item1 == 0;
-        }
-
-        private async Task<bool> FlashPartitionChunkedAsync(
-            string fhLoader,
-            string device,
-            string workDir,
-            FlashPartitionInfo partition,
-            string spoofLabel,
-            string spoofFilename,
-            CancellationToken ct)
-        {
-            var fileSize = partition.FileSize;
-            var sectorSize = partition.SectorSize;
-            var chunkSizeBytes = CHUNK_SIZE;
-            var chunkSizeSectors = chunkSizeBytes / sectorSize;
-
-            long currentOffset = 0;
-            ulong currentSector = partition.StartSector;
-            int chunkIndex = 0;
-            var spoofFilePath = Path.Combine(workDir, spoofFilename);
-
-            while (currentOffset < fileSize)
-            {
-                if (ct.IsCancellationRequested)
-                {
-                    onLine?.Invoke("Task cancelled");
-                    return false;
-                }
-                var remainingBytes = fileSize - currentOffset;
-                var bytesToWrite = Math.Min(remainingBytes, chunkSizeBytes);
-                var sectorsToWrite = (bytesToWrite + sectorSize - 1) / sectorSize;
-
-                chunkIndex++;
-                var totalChunks = (int)Math.Ceiling((double)fileSize / chunkSizeBytes);
-                onLine?.Invoke($"  Writing chunk {chunkIndex}/{totalChunks} ({bytesToWrite / 1024 / 1024} MB)...");
-
-                try
-                {
-                    using (var sourceStream = new FileStream(partition.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    using (var destStream = new FileStream(spoofFilePath, FileMode.Create, FileAccess.Write))
-                    {
-                        sourceStream.Seek(currentOffset, SeekOrigin.Begin);
-                        var buffer = new byte[1024 * 1024]; // 1MB buffer
-                        long remaining = bytesToWrite;
-                        while (remaining > 0)
-                        {
-                            var toRead = (int)Math.Min(buffer.Length, remaining);
-                            var read = await sourceStream.ReadAsync(buffer, 0, toRead, ct);
-                            if (read == 0) break;
-                            await destStream.WriteAsync(buffer, 0, read, ct);
-                            remaining -= read;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    onLine?.Invoke($"[Error] Failed to extract chunk: {ex.Message}");
-                    return false;
-                }
-
-                var xmlContent = $"<?xml version=\"1.0\" ?><data>" +
-                    $"<program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" " +
-                    $"filename=\"{spoofFilename}\" " +
-                    $"label=\"{spoofLabel}\" " +
-                    $"num_partition_sectors=\"{sectorsToWrite}\" " +
-                    $"physical_partition_number=\"{partition.Lun}\" " +
-                    $"sparse=\"false\" " +
-                    $"start_sector=\"{currentSector}\" />" +
-                    $"</data>";
-
-                var xmlPath = Path.Combine(workDir, $"flash_{partition.Name}_chunk{chunkIndex}_{Guid.NewGuid():N}.xml");
-                await File.WriteAllTextAsync(xmlPath, xmlContent, ct);
-
-                var args = $"--port={device} --memoryname={StorageType} " +
-                    $"--search_path=\"{workDir}\" " +
-                    $"--sendxml=\"{xmlPath}\" " +
-                    $"--mainoutputdir=\"{workDir}\" " +
-                    $"--skip_configure --showpercentagecomplete --noprompt";
-
-                var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-
-                try
-                {
-                    var traceFile = Path.Combine(workDir, "port_trace.txt");
-                    if (File.Exists(traceFile))
-                    {
-                        var traceContent = await File.ReadAllTextAsync(traceFile);
-                        var logFile = Path.Combine(workDir, "flash_full_log.txt");
-                        await File.AppendAllTextAsync(logFile, $"\n\n========== {partition.Name} Chunk {chunkIndex} ==========\n{traceContent}");
-                    }
-                }
-                catch { }
-
-                try { File.Delete(xmlPath); } catch { }
-
-                if (res.Item1 != 0)
-                {
-                    onLine?.Invoke($"[Error] Chunk {chunkIndex} write failed");
-                    try { File.Delete(spoofFilePath); } catch { }
-                    return false;
-                }
-
-                currentOffset += bytesToWrite;
-                currentSector += (ulong)sectorsToWrite;
-
-                if (currentOffset < fileSize)
-                {
-                    await Task.Delay(CHUNK_DELAY_MS, ct);
-                }
-            }
-
-            try { File.Delete(spoofFilePath); } catch { }
-
-            return true;
-        }
-
-        private static string FormatFileSize(long bytes)
-        {
-            if (bytes >= 1024L * 1024 * 1024)
-                return $"{bytes / 1024.0 / 1024 / 1024:F2} GB";
-            if (bytes >= 1024 * 1024)
-                return $"{bytes / 1024.0 / 1024:F2} MB";
-            if (bytes >= 1024)
-                return $"{bytes / 1024.0:F2} KB";
-            return $"{bytes} B";
-        }
-
-        private const long CHUNK_SIZE_64MB = 64 * 1024 * 1024; 
-        private const int MODE_DETECT_DELAY_MS = 200; 
-
-        public async Task<OplusRwMode> DetectRwModeAsync(string port)
-        {
-            var (rwmode, gptmainMode) = await TestRwModeAsync(port);
-            await Task.Delay(MODE_DETECT_DELAY_MS);
-            
-            if (rwmode == "oplus_gptbackup")
-                return OplusRwMode.GptBackup;
-            else if (rwmode == "oplus_gptmain" && gptmainMode == "1")
-                return OplusRwMode.GptMain1;
-            else if (rwmode == "oplus_gptmain" && gptmainMode == "2")
-                return OplusRwMode.GptMain2;
-            else
-                return OplusRwMode.Normal;
-        }
-
-        private static string GetRwModeParam(OplusRwMode mode)
-        {
-            return mode switch
-            {
-                OplusRwMode.GptBackup => "oplus_gptbackup",
-                OplusRwMode.GptMain1 => "oplus_gptmain",
-                OplusRwMode.GptMain2 => "oplus_gptmain",
-                _ => ""
-            };
-        }
-
-        public Dictionary<int, LunFirstPartitionInfo> ParseLunFirstPartitions(List<string> xmlPaths, OplusRwMode mode)
-        {
-            var result = new Dictionary<int, LunFirstPartitionInfo>();
-            ulong targetSector = mode == OplusRwMode.GptMain1 ? 6UL : 35UL;
-            
-            foreach (var xmlPath in xmlPaths)
-            {
-                try
-                {
-                    if (!File.Exists(xmlPath)) continue;
-                    var doc = System.Xml.Linq.XDocument.Load(xmlPath);
-                    var programs = doc.Descendants("program");
-                    
-                    foreach (var program in programs)
-                    {
-                        var label = program.Attribute("label")?.Value ?? "";
-                        var filename = program.Attribute("filename")?.Value ?? "";
-                        var ppnStr = program.Attribute("physical_partition_number")?.Value ?? "0";
-                        var startSectorStr = program.Attribute("start_sector")?.Value ?? "0";
-                        if (label == "PrimaryGPT" || label == "BackupGPT") continue;
-                        
-                        if (!int.TryParse(ppnStr, out int lun)) continue;
-                        if (!ulong.TryParse(startSectorStr, out ulong startSector)) continue;
-                        if (startSector == targetSector && !result.ContainsKey(lun))
-                        {
-                            result[lun] = new LunFirstPartitionInfo
-                            {
-                                Lun = lun,
-                                Filename = filename,
-                                Label = label,
-                                StartSector = startSector
-                            };
-                            onLine?.Invoke($"[Mode] LUN {lun} first partition: {label} (filename={filename}, start_sector={startSector})");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    onLine?.Invoke($"[Warning] Failed to parse {Path.GetFileName(xmlPath)}: {ex.Message}");
-                }
-            }
-            
-            return result;
-        }
-
-        public List<PartitionSlice> GeneratePartitionSlices(
-            PartitionXmlInfo partition,
-            int sectorSize,
-            OplusRwMode mode,
-            LunFirstPartitionInfo? lunFirstPartition)
-        {
-            var slices = new List<PartitionSlice>();
-            var lun = partition.physicalPartitionNumber;
-            ulong specialSector = mode == OplusRwMode.GptMain1 ? 6UL : 34UL;
-            ulong afterSpecialSector = specialSector + 1; 
-            ulong partStart = partition.startSector;
-            ulong partEnd = partition.startSector + partition.numPartitionSectors; 
-            ulong currentSector = partStart;
-            long currentFileOffset = 0;
-            
-            while (currentSector < partEnd)
-            {
-                ulong sliceStart = currentSector;
-                ulong sliceEnd;
-                string filename;
-                string label;
-                int ppn = lun;
-                
-                if (mode == OplusRwMode.GptBackup)
-                {
-                    ulong maxSectors = (ulong)(CHUNK_SIZE_64MB / sectorSize);
-                    sliceEnd = Math.Min(currentSector + maxSectors, partEnd);
-                    filename = $"gpt_backup{lun}.bin";
-                    label = "BackupGPT";
-                }
-                else if (mode == OplusRwMode.GptMain1 || mode == OplusRwMode.GptMain2)
-                {
-                    if (currentSector == specialSector)
-                    {
-                        sliceEnd = currentSector + 1;
-                        if (lunFirstPartition != null)
-                        {
-                            filename = lunFirstPartition.Filename;
-                            label = lunFirstPartition.Label;
-                            ppn = lunFirstPartition.Lun;
-                        }
-                        else
-                        {
-                            filename = partition.filename;
-                            label = partition.label;
-                        }
-                    }
-                    else if (currentSector < specialSector)
-                    {
-                        sliceEnd = Math.Min(specialSector, partEnd);
-                        filename = $"gptmain{lun}.bin";
-                        label = "PrimaryGPT";
-                    }
-                    else
-                    {
-                        ulong maxSectors = (ulong)(CHUNK_SIZE_64MB / sectorSize);
-                        sliceEnd = Math.Min(currentSector + maxSectors, partEnd);
-                        filename = $"gptmain{lun}.bin";
-                        label = "PrimaryGPT";
-                    }
-                }
-                else
-                {
-                    ulong maxSectors = (ulong)(CHUNK_SIZE_64MB / sectorSize);
-                    sliceEnd = Math.Min(currentSector + maxSectors, partEnd);
-                    filename = partition.filename;
-                    label = partition.label;
-                }
-                
-                ulong numSectors = sliceEnd - sliceStart;
-                long byteSize = (long)numSectors * sectorSize;
-                
-                slices.Add(new PartitionSlice
-                {
-                    StartSector = sliceStart,
-                    NumSectors = numSectors,
-                    Filename = filename,
-                    Label = label,
-                    PhysicalPartitionNumber = ppn,
-                    FileOffset = currentFileOffset,
-                    ByteSize = byteSize
-                });
-                
-                currentSector = sliceEnd;
-                currentFileOffset += byteSize;
-            }
-            
-            return slices;
-        }
-
-        public async Task<bool> FlashWithUnifiedModeAsync(
-            string port,
-            List<string> xmlPaths,
-            string searchPath,
-            CancellationToken cancellationToken = default)
-        {
-            var tools = FindToolsDir();
-            var workDir = GetWorkDir();
-            var device = BuildDevicePath(port);
-            var fhLoader = Path.Combine(tools, "fh_loader.exe");
-            var sectorSize = StorageType == "emmc" ? 512 : 4096;
-            onLine?.Invoke("Detecting RW mode...");
-            var mode = await DetectRwModeAsync(port);
-            onLine?.Invoke($"Detected mode: {mode}");
-            var rwmodeParam = GetRwModeParam(mode);
-            Dictionary<int, LunFirstPartitionInfo>? lunFirstPartitions = null;
-            if (mode == OplusRwMode.GptMain1 || mode == OplusRwMode.GptMain2)
-            {
-                lunFirstPartitions = ParseLunFirstPartitions(xmlPaths, mode);
-            }
-
-            if (searchPath.EndsWith("\\")) searchPath = searchPath.TrimEnd('\\');
-            if (searchPath.EndsWith(":")) searchPath += ".";
-            
-            onLine?.Invoke("Flashing GPT partition tables...");
-            var gptSuccess = await FlashGptPartitionsAsync(port, xmlPaths, searchPath, mode, cancellationToken);
-            if (!gptSuccess)
-            {
-                onLine?.Invoke("[Error] Failed to flash GPT partition tables");
-                return false;
-            }
-            
-            foreach (var xmlPath in xmlPaths)
-            {
-                if (cancellationToken.IsCancellationRequested) return false;
-                
-                onLine?.Invoke($"Processing: {Path.GetFileName(xmlPath)}");
-                var partitions = ParseFullPartitionInfoFromXml(xmlPath);
-                
-                foreach (var partition in partitions)
-                {
-                    if (cancellationToken.IsCancellationRequested) return false;
-                    
-                    if (partition.label == "PrimaryGPT" || partition.label == "BackupGPT")
-                        continue;
-                    
-                    var filePath = Path.Combine(searchPath, partition.filename);
-                    if (!File.Exists(filePath))
-                    {
-                        onLine?.Invoke($"[Skip] File not found: {partition.filename}");
-                        continue;
-                    }
-                    
-                    var fileSize = new FileInfo(filePath).Length;
-                    onLine?.Invoke($"Flashing: {partition.label} ({FormatFileSize(fileSize)})");
-                    LunFirstPartitionInfo? lunFirst = null;
-                    lunFirstPartitions?.TryGetValue(partition.physicalPartitionNumber, out lunFirst);
-                    var slices = GeneratePartitionSlices(partition, sectorSize, mode, lunFirst);
-                    onLine?.Invoke($"  Generated {slices.Count} slice(s)");
-                    foreach (var slice in slices)
-                    {
-                        if (cancellationToken.IsCancellationRequested) return false;
-                        
-                        var success = await FlashSliceAsync(
-                            fhLoader, device, workDir, searchPath,
-                            filePath, slice, sectorSize, rwmodeParam, cancellationToken);
-                        
-                        if (!success)
-                        {
-                            onLine?.Invoke($"[Error] Failed to flash slice: sector {slice.StartSector}-{slice.StartSector + slice.NumSectors - 1}");
-                            return false;
-                        }
-                    }
-                    
-                    onLine?.Invoke($"[Success] {partition.label}");
-                }
-            }
-            
-            onLine?.Invoke("All partitions flashed successfully");
-            return true;
-        }
-
-        private async Task<bool> FlashGptPartitionsAsync(
-            string port,
-            List<string> xmlPaths,
-            string searchPath,
-            OplusRwMode mode,
-            CancellationToken cancellationToken)
-        {
-            var tools = FindToolsDir();
-            var workDir = GetWorkDir();
-            var device = BuildDevicePath(port);
-            var fhLoader = Path.Combine(tools, "fh_loader.exe");
-            var sectorSize = StorageType == "emmc" ? 512 : 4096;
-            var rwmodeParam = GetRwModeParam(mode);
-            
-            var gptPartitions = new List<(PartitionXmlInfo partition, string xmlPath)>();
-            
-            foreach (var xmlPath in xmlPaths)
-            {
-                try
-                {
-                    if (!File.Exists(xmlPath)) continue;
-                    var doc = System.Xml.Linq.XDocument.Load(xmlPath);
-                    var programs = doc.Descendants("program");
-                    
-                    foreach (var program in programs)
-                    {
-                        var label = program.Attribute("label")?.Value ?? "";
-                        if (label != "PrimaryGPT" && label != "BackupGPT") continue;
-                        
-                        var filename = program.Attribute("filename")?.Value ?? "";
-                        var ppnStr = program.Attribute("physical_partition_number")?.Value ?? "0";
-                        var startSectorStr = program.Attribute("start_sector")?.Value ?? "0";
-                        var numSectorsStr = program.Attribute("num_partition_sectors")?.Value ?? "0";
-                        
-                        if (!int.TryParse(ppnStr, out int lun)) continue;
-                        if (!ulong.TryParse(startSectorStr, out ulong startSector)) continue;
-                        if (!ulong.TryParse(numSectorsStr, out ulong numSectors)) continue;
-                        
-                        gptPartitions.Add((new PartitionXmlInfo
-                        {
-                            label = label,
-                            filename = filename,
-                            physicalPartitionNumber = lun,
-                            startSector = startSector,
-                            numPartitionSectors = numSectors
-                        }, xmlPath));
-                    }
-                }
-                catch { }
-            }
-            
-            foreach (var (partition, xmlPath) in gptPartitions)
-            {
-                if (cancellationToken.IsCancellationRequested) return false;
-                
-                var lun = partition.physicalPartitionNumber;
-                
-                string? gptFilePath = null;
-                string gptFilename;
-                
-                if (mode == OplusRwMode.GptMain1 || mode == OplusRwMode.GptMain2)
-                {
-                    var gptmainPath = Path.Combine(searchPath, $"gptmain{lun}.bin");
-                    var gptBackupPath = Path.Combine(searchPath, $"gpt_backup{lun}.bin");
-                    
-                    if (File.Exists(gptmainPath))
-                    {
-                        gptFilePath = gptmainPath;
-                        gptFilename = $"gptmain{lun}.bin";
-                    }
-                    else if (File.Exists(gptBackupPath))
-                    {
-                        gptFilePath = gptBackupPath;
-                        gptFilename = $"gpt_backup{lun}.bin";
-                        onLine?.Invoke($"[Info] gptmain{lun}.bin not found, using gpt_backup{lun}.bin");
-                    }
-                    else
-                    {
-                        var origPath = Path.Combine(searchPath, partition.filename);
-                        if (File.Exists(origPath))
-                        {
-                            gptFilePath = origPath;
-                            gptFilename = partition.filename;
-                        }
-                        else
-                        {
-                            onLine?.Invoke($"[Skip] GPT file not found for LUN {lun}");
-                            continue;
-                        }
-                    }
-                }
-                else
-                {
-                    var gptBackupPath = Path.Combine(searchPath, $"gpt_backup{lun}.bin");
-                    var gptmainPath = Path.Combine(searchPath, $"gptmain{lun}.bin");
-                    
-                    if (File.Exists(gptBackupPath))
-                    {
-                        gptFilePath = gptBackupPath;
-                        gptFilename = $"gpt_backup{lun}.bin";
-                    }
-                    else if (File.Exists(gptmainPath))
-                    {
-                        gptFilePath = gptmainPath;
-                        gptFilename = $"gptmain{lun}.bin";
-                    }
-                    else
-                    {
-                        var origPath = Path.Combine(searchPath, partition.filename);
-                        if (File.Exists(origPath))
-                        {
-                            gptFilePath = origPath;
-                            gptFilename = partition.filename;
-                        }
-                        else
-                        {
-                            onLine?.Invoke($"[Skip] GPT file not found for LUN {lun}");
-                            continue;
-                        }
-                    }
-                }
-                
-                onLine?.Invoke($"Flashing GPT: {partition.label} LUN{lun} ({gptFilename})");
-                
-                string spoofFilename;
-                string spoofLabel;
-                
-                if (mode == OplusRwMode.GptBackup)
-                {
-                    spoofFilename = $"gpt_backup{lun}.bin";
-                    spoofLabel = "BackupGPT";
-                }
-                else
-                {
-                    spoofFilename = $"gptmain{lun}.bin";
-                    spoofLabel = "PrimaryGPT";
-                }
-                
-                var spoofFilePath = Path.Combine(workDir, spoofFilename);
-                try
-                {
-                    File.Copy(gptFilePath, spoofFilePath, true);
-                }
-                catch (Exception ex)
-                {
-                    onLine?.Invoke($"[Error] Failed to copy GPT file: {ex.Message}");
-                    return false;
-                }
-                
-                var fileSize = new FileInfo(gptFilePath).Length;
-                var numSectors = (fileSize + sectorSize - 1) / sectorSize;
-                
-                var xmlContent = $"<?xml version=\"1.0\" ?><data>" +
-                    $"<program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" " +
-                    $"filename=\"{spoofFilename}\" " +
-                    $"label=\"{spoofLabel}\" " +
-                    $"num_partition_sectors=\"{numSectors}\" " +
-                    $"physical_partition_number=\"{lun}\" " +
-                    $"sparse=\"false\" " +
-                    $"start_sector=\"{partition.startSector}\" />" +
-                    $"</data>";
-                
-                var tempXmlPath = Path.Combine(workDir, $"gpt_{lun}_{Guid.NewGuid():N}.xml");
-                await File.WriteAllTextAsync(tempXmlPath, xmlContent, cancellationToken);
-                
-                var rwmodeArg = string.IsNullOrEmpty(rwmodeParam) ? "" : $"--special_rw_mode={rwmodeParam}";
-                var args = $"--port={device} --memoryname={StorageType} " +
-                    $"--search_path=\"{workDir}\" " +
-                    $"--sendxml=\"{tempXmlPath}\" " +
-                    $"--mainoutputdir=\"{workDir}\" " +
-                    $"--skip_configure --showpercentagecomplete {rwmodeArg} --noprompt";
-                
-                var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-                
-                try { File.Delete(tempXmlPath); } catch { }
-                try { File.Delete(spoofFilePath); } catch { }
-                
-                if (res.Item1 != 0)
-                {
-                    onLine?.Invoke($"[Error] Failed to flash GPT LUN{lun}");
-                    return false;
-                }
-            }
-            
-            return true;
-        }
-
-        private async Task<bool> FlashSliceAsync(
-            string fhLoader,
-            string device,
-            string workDir,
-            string searchPath,
-            string sourceFilePath,
-            PartitionSlice slice,
-            int sectorSize,
-            string rwmodeParam,
-            CancellationToken cancellationToken)
-        {
-            var spoofFilePath = Path.Combine(workDir, slice.Filename);
-            
-            try
-            {
-                using (var sourceStream = new FileStream(sourceFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var destStream = new FileStream(spoofFilePath, FileMode.Create, FileAccess.Write))
-                {
-                    sourceStream.Seek(slice.FileOffset, SeekOrigin.Begin);
-                    var buffer = new byte[1024 * 1024]; 
-                    long remaining = slice.ByteSize;
-                    while (remaining > 0)
-                    {
-                        var toRead = (int)Math.Min(buffer.Length, remaining);
-                        var read = await sourceStream.ReadAsync(buffer, 0, toRead, cancellationToken);
-                        if (read == 0) break;
-                        await destStream.WriteAsync(buffer, 0, read, cancellationToken);
-                        remaining -= read;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                onLine?.Invoke($"[Error] Failed to extract slice: {ex.Message}");
-                return false;
-            }
-            
-            var xmlContent = $"<?xml version=\"1.0\" ?><data>" +
-                $"<program SECTOR_SIZE_IN_BYTES=\"{sectorSize}\" " +
-                $"filename=\"{slice.Filename}\" " +
-                $"label=\"{slice.Label}\" " +
-                $"num_partition_sectors=\"{slice.NumSectors}\" " +
-                $"physical_partition_number=\"{slice.PhysicalPartitionNumber}\" " +
-                $"sparse=\"false\" " +
-                $"start_sector=\"{slice.StartSector}\" />" +
-                $"</data>";
-            
-            var xmlPath = Path.Combine(workDir, $"slice_{slice.StartSector}_{Guid.NewGuid():N}.xml");
-            await File.WriteAllTextAsync(xmlPath, xmlContent, cancellationToken);
-            
-            var rwmodeArg = string.IsNullOrEmpty(rwmodeParam) ? "" : $"--special_rw_mode={rwmodeParam}";
-            var args = $"--port={device} --memoryname={StorageType} " +
-                $"--search_path=\"{workDir}\" " +
-                $"--sendxml=\"{xmlPath}\" " +
-                $"--mainoutputdir=\"{workDir}\" " +
-                $"--skip_configure --showpercentagecomplete {rwmodeArg} --noprompt";
-            
-            var res = await ProcessRunner.RunAsync(fhLoader, args, workDir, onLine, onPercent);
-            
-            try { File.Delete(xmlPath); } catch { }
-            try { File.Delete(spoofFilePath); } catch { }
-            
-            return res.Item1 == 0;
         }
     }
 }

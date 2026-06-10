@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace OplusEdlTool.Services
 {
@@ -11,8 +10,11 @@ namespace OplusEdlTool.Services
         private static readonly string SettingsFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "OplusEdlTool", "language.json");
+
         public static string CurrentLanguage => _currentLanguage;
+
         public static bool IsChinese => _currentLanguage == "zh";
+
         public static void Initialize()
         {
             try
@@ -22,7 +24,8 @@ namespace OplusEdlTool.Services
                 {
                     var json = File.ReadAllText(SettingsFile);
                     System.Diagnostics.Debug.WriteLine($"Language settings content: {json}");
-                    var settings = JsonSerializer.Deserialize(json, LanguageJsonContext.Default.LanguageSettings);
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var settings = JsonSerializer.Deserialize<LanguageSettings>(json, options);
                     if (settings != null && !string.IsNullOrEmpty(settings.Language))
                     {
                         _currentLanguage = settings.Language;
@@ -40,6 +43,7 @@ namespace OplusEdlTool.Services
                 _currentLanguage = "en";
             }
         }
+
         public static bool SaveLanguage(string language)
         {
             try
@@ -51,9 +55,11 @@ namespace OplusEdlTool.Services
                 }
 
                 var settings = new LanguageSettings { Language = language };
-                var json = JsonSerializer.Serialize(settings, LanguageJsonContext.Default.LanguageSettings);
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(settings, options);
                 File.WriteAllText(SettingsFile, json);
                 _currentLanguage = language;
+                
                 return File.Exists(SettingsFile);
             }
             catch (Exception ex)
@@ -62,6 +68,7 @@ namespace OplusEdlTool.Services
                 return false;
             }
         }
+
         public static bool ToggleLanguage()
         {
             var newLang = _currentLanguage == "en" ? "zh" : "en";
@@ -73,31 +80,30 @@ namespace OplusEdlTool.Services
             return _currentLanguage == "zh" ? "Translate to English" : "切换为中文";
         }
 
-        internal class LanguageSettings
+        private class LanguageSettings
         {
             public string Language { get; set; } = "en";
         }
     }
 
-    [JsonSerializable(typeof(LanguageService.LanguageSettings))]
-    internal partial class LanguageJsonContext : JsonSerializerContext
-    {
-    }
-
     public static class Lang
     {
         public static string WindowTitle => LanguageService.IsChinese ? "OPLUS EDL 工具" : "OPLUS EDL Tool";
+        
         public static string About => LanguageService.IsChinese ? "关于" : "About";
+        
         public static string EnterFirehoseMode => LanguageService.IsChinese ? "进入 Firehose 模式" : "Enter Firehose Mode";
         public static string DeviceProgrammer => LanguageService.IsChinese ? "引导文件 (devprg*.mbn)" : "Device Programmer (devprg*.mbn)";
         public static string Digest => LanguageService.IsChinese ? "Digest文件 (*.bin)" : "Digest (*.bin)";
         public static string Sig => LanguageService.IsChinese ? "签名文件 (*.bin)" : "Sig (*.bin)";
         public static string EnterFirehose => LanguageService.IsChinese ? "进入 Firehose" : "Enter Firehose";
+        
         public static string FlashPackage => LanguageService.IsChinese ? "刷机包 (ROM)" : "Flash Package (ROM)";
         public static string SelectRomFolder => LanguageService.IsChinese ? "选择 ROM 文件夹或 OFP/OPS 文件" : "Select ROM folder or OFP/OPS file";
         public static string Load => LanguageService.IsChinese ? "加载" : "Load";
         public static string All => LanguageService.IsChinese ? "全选" : "All";
         public static string None => LanguageService.IsChinese ? "取消" : "None";
+        
         public static string Partitions => LanguageService.IsChinese ? "分区" : "Partitions";
         public static string Search => LanguageService.IsChinese ? "搜索:" : "Search:";
         public static string SearchPartition => LanguageService.IsChinese ? "按名称搜索分区" : "Search partition by name";
@@ -118,8 +124,7 @@ namespace OplusEdlTool.Services
         public static string AutoRebootTooltip => LanguageService.IsChinese ? "刷机完成后自动重启设备" : "Automatically reboot device after flashing is complete";
         public static string ExportXml => LanguageService.IsChinese ? "导出 XML" : "Export XML";
         public static string ExportXmlTooltip => LanguageService.IsChinese ? "备份分区时同时导出 rawprogram XML 文件" : "Export rawprogram XML when backing up partitions";
-        public static string StartFlash => LanguageService.IsChinese ? "开始刷机" : "Start Flash";
-        public static string ProtectLun5 => LanguageService.IsChinese ? "保护 LUN5" : "Protect LUN5";
+        
         public static string Log => LanguageService.IsChinese ? "日志" : "Log";
         public static string Port9008 => LanguageService.IsChinese ? "9008 端口:" : "9008 Port:";
         public static string NotDetected => LanguageService.IsChinese ? "未检测到" : "Not detected";
@@ -127,6 +132,7 @@ namespace OplusEdlTool.Services
         public static string VerboseTooltip => LanguageService.IsChinese ? "显示详细的 fh_loader 输出用于调试" : "Show detailed fh_loader output for debugging";
         public static string Clear => LanguageService.IsChinese ? "清除" : "Clear";
         public static string Refresh => LanguageService.IsChinese ? "刷新" : "Refresh";
+        
         public static string SelectRomSource => LanguageService.IsChinese ? "选择 ROM 来源" : "Select ROM Source";
         public static string SelectFolderOrFile => LanguageService.IsChinese ? "是 = 选择文件夹\n否 = 选择 OFP/OPS 文件" : "Yes = Select Folder\nNo = Select OFP/OPS File";
         public static string ConfirmFlash => LanguageService.IsChinese ? "确认刷机" : "Confirm Flash";
@@ -143,11 +149,13 @@ namespace OplusEdlTool.Services
         public static string NoSelection => LanguageService.IsChinese ? "未选择" : "No Selection";
         public static string PleaseSelectXml => LanguageService.IsChinese ? "请至少选择一个 XML 文件来加载。" : "Please select at least one XML file to load.";
         public static string Error => LanguageService.IsChinese ? "错误" : "Error";
+        
         public static string LanguageSwitch => LanguageService.IsChinese ? "切换语言" : "Switch Language";
         public static string LanguageSwitchMessage => LanguageService.IsChinese 
             ? "语言将切换为英语。\n需要重启应用程序才能生效。\n\n是否立即重启？" 
             : "Language will be switched to Chinese.\nApplication restart is required.\n\nRestart now?";
         public static string RestartRequired => LanguageService.IsChinese ? "需要重启" : "Restart Required";
+        
         public static string PortStatusRefreshed => LanguageService.IsChinese ? "端口状态已刷新" : "Port status refreshed";
         public static string VerboseLoggingEnabled => LanguageService.IsChinese ? "详细日志已启用" : "Verbose logging enabled";
         public static string VerboseLoggingDisabled => LanguageService.IsChinese ? "详细日志已禁用" : "Verbose logging disabled";
@@ -174,24 +182,18 @@ namespace OplusEdlTool.Services
         public static string XmlLoadedFrom => LanguageService.IsChinese ? "XML 文件已从以下位置加载: {0}" : "XML files loaded from: {0}";
         public static string TipClickLoad => LanguageService.IsChinese ? "提示: 点击 '加载' 解析分区，然后选择要刷写的分区。" : "Tip: Click 'Load' to parse partitions, then select partitions to flash.";
         public static string CannotDetermineDir => LanguageService.IsChinese ? "无法从拖入的 XML 文件确定目录" : "Cannot determine directory from dropped XML file";
+        
         public static string NoPartitionsForExport => LanguageService.IsChinese ? "没有选中分区用于导出" : "No partitions selected for export";
         public static string ExportedXml => LanguageService.IsChinese ? "已导出 XML: {0}" : "Exported XML: {0}";
         public static string ExportXmlFailed => LanguageService.IsChinese ? "导出 XML 失败: {0}" : "Export XML failed: {0}";
+        
         public static string SelectReadMethod => LanguageService.IsChinese ? "选择读取方式" : "Select Read Method";
         public static string SelectReadMethodMessage => LanguageService.IsChinese 
             ? "选择读取方式:\n\n是 - 自动读取 (读取分区表中选中的分区)\n否 - 自定义 XML 读取 (读取 XML 文件中指定的分区)\n取消 - 取消操作" 
             : "Choose read method:\n\nYES - Auto Read (Read selected partitions from partition table)\nNO - Custom XML Read (Read partitions specified in XML files)\nCANCEL - Cancel operation";
-        public static string PersistPartitionWarning => LanguageService.IsChinese ? "persist 分区警告" : "Persist Partition Warning";
+        public static string PersistPartitionWarning => LanguageService.IsChinese ? "Persist分区警告" : "Persist Partition Warning";
         public static string PersistPartitionWarningMessage => LanguageService.IsChinese 
-            ? "检测到您选择了 persist 分区。\n\n刷写此分区可能会导致传感器功能异常（如指纹、陀螺仪等）。\n\n是否仍要刷写 persist 分区？\n\n是 = 刷写 persist 分区\n否 = 跳过 persist 分区" 
-            : "You have selected the persist partition.\n\nFlashing this partition may cause sensor malfunctions (fingerprint, gyroscope, etc.).\n\nDo you still want to flash the persist partition?\n\nYes = Flash persist partition\nNo = Skip persist partition";
-        public static string PersistPartitionSkipped => LanguageService.IsChinese ? "已跳过 persist 分区" : "Persist partition skipped";
-        
-        public static string OcdtPartitionWarning => LanguageService.IsChinese ? "ocdt 分区警告" : "OCDT Partition Warning";
-        public static string OcdtPartitionWarningMessage => LanguageService.IsChinese 
-            ? "检测到您选择了 ocdt 分区且已指定镜像文件。\n\n刷写此分区可能会影响设备显示配置（如屏幕校准、显示参数等）。\n\n是否仍要刷写 ocdt 分区？\n\n是 = 刷写 ocdt 分区\n否 = 跳过 ocdt 分区" 
-            : "You have selected the ocdt partition with a valid image file.\n\nFlashing this partition may affect device display configuration (screen calibration, display parameters, etc.).\n\nDo you still want to flash the ocdt partition?\n\nYes = Flash ocdt partition\nNo = Skip ocdt partition";
-        public static string OcdtPartitionSkipped => LanguageService.IsChinese ? "已跳过 ocdt 分区" : "OCDT partition skipped";
-        
+            ? "您选择了刷写persist分区。\n\n警告：刷写persist分区可能会导致传感器或指纹功能丢失！\n\n是否要继续刷写persist分区？\n\n选择\"是\"继续刷写，选择\"否\"跳过persist分区。" 
+            : "You have selected to flash the persist partition.\n\nWarning: Flashing the persist partition may cause sensor or fingerprint functionality loss!\n\nDo you want to continue flashing the persist partition?\n\nSelect 'Yes' to continue flashing, select 'No' to skip the persist partition.";
     }
 }
